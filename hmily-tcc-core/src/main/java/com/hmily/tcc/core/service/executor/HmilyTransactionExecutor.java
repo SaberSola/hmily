@@ -221,8 +221,16 @@ public class HmilyTransactionExecutor {
                     context.setAction(TccActionEnum.CONFIRMING.getCode());
                     context.setTransId(participant.getTransId());
                     TransactionContextLocal.getInstance().set(context);
-                    //执行远程方法
+                    /**
+                     *  1 循环第一次执行order阶段的confirm阶段方法
+                     *  2 第二此执行AccountClient中 payment方法通过FeignHandler进入到payment() 在进入ParticipantHmilyTransactionHandler中
+                     *    因为是conform阶段所以进入到patmennt对应的confirm方法中
+                     *  3 执行 InventoryClient中的 decrease方法 进入到ParticipantHmilyTransactionHandler 中
+                     *    因为是conform 阶段 所以进入到decrease的conform方法中
+                     */
                     executeParticipantMethod(participant.getConfirmTccInvocation());
+                    LOGGER.debug("参与者的方法 className:{} + methodName :{} ",
+                            participant.getConfirmTccInvocation().getTargetClass().getName(),participant.getConfirmTccInvocation().getMethodName());
                 } catch (Exception e) {
                     LogUtil.error(LOGGER, "execute confirm :{}", () -> e);
                     success = false;
@@ -235,7 +243,7 @@ public class HmilyTransactionExecutor {
 
     /**
      * cancel transaction.
-     *
+     * cancle 阶段与与conform类似
      * @param currentTransaction {@linkplain TccTransaction}
      */
     public void cancel(final TccTransaction currentTransaction) {
@@ -305,6 +313,7 @@ public class HmilyTransactionExecutor {
             final Object[] args = tccInvocation.getArgs();
             final Class[] parameterTypes = tccInvocation.getParameterTypes();
             final Object bean = SpringBeanUtils.getInstance().getBean(clazz);
+            LOGGER.debug("类名称className:{},方法名称methodName :{}",clazz.getName(),method);
             MethodUtils.invokeMethod(bean, method, args, parameterTypes);
         }
     }

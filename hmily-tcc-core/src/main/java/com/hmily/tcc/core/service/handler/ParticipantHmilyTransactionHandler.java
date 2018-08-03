@@ -18,6 +18,7 @@
 package com.hmily.tcc.core.service.handler;
 
 import com.hmily.tcc.common.bean.context.TccTransactionContext;
+import com.hmily.tcc.common.bean.entity.Participant;
 import com.hmily.tcc.common.bean.entity.TccTransaction;
 import com.hmily.tcc.common.enums.TccActionEnum;
 import com.hmily.tcc.core.cache.TccTransactionCacheManager;
@@ -25,10 +26,13 @@ import com.hmily.tcc.core.service.HmilyTransactionHandler;
 import com.hmily.tcc.core.service.executor.HmilyTransactionExecutor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
 /**
  * Participant Handler.
@@ -39,6 +43,8 @@ import java.lang.reflect.Method;
 public class ParticipantHmilyTransactionHandler implements HmilyTransactionHandler {
 
     private final HmilyTransactionExecutor hmilyTransactionExecutor;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ParticipantHmilyTransactionHandler.class);
 
     @Autowired
     public ParticipantHmilyTransactionHandler(final HmilyTransactionExecutor hmilyTransactionExecutor) {
@@ -54,6 +60,18 @@ public class ParticipantHmilyTransactionHandler implements HmilyTransactionHandl
                 try {
                     tccTransaction = hmilyTransactionExecutor.beginParticipant(context, point);
                     final Object proceed = point.proceed();
+
+                    String targetClass = tccTransaction.getTargetClass();
+                    String methodName = tccTransaction.getTargetMethod();
+                    //参与者方法
+                    LOGGER.debug("try 阶段目标 className :{}, methodName :{} " ,targetClass,methodName);
+                    List<Participant> participants = tccTransaction.getParticipants();
+                    participants.stream().forEach(participant -> {
+
+                    LOGGER.debug("try 阶段合作者的 className:{} ,methodName :{}",participant.getConfirmTccInvocation().getTargetClass().getName()
+                    ,participant.getConfirmTccInvocation().getMethodName());
+                    });
+
                     tccTransaction.setStatus(TccActionEnum.TRYING.getCode());
                     //update log status to try
                     hmilyTransactionExecutor.updateStatus(tccTransaction);
@@ -65,6 +83,17 @@ public class ParticipantHmilyTransactionHandler implements HmilyTransactionHandl
                 }
             case CONFIRMING:
                 currentTransaction = TccTransactionCacheManager.getInstance().getTccTransaction(context.getTransId());
+                //confirming 阶段中
+                String targetClass = currentTransaction.getTargetClass();
+                String methodName  = currentTransaction.getTargetMethod();
+                LOGGER.debug("confirming 阶段目标 className :{}, methodName :{} " ,targetClass,methodName);
+
+                List<Participant> participants = currentTransaction.getParticipants();
+                participants.stream().forEach(participant ->{
+                    LOGGER.debug("conform 阶段合作者的 className:{} ,methodName :{}",participant.getConfirmTccInvocation().getTargetClass().getName()
+                            ,participant.getConfirmTccInvocation().getMethodName());
+                });
+
                 hmilyTransactionExecutor.confirm(currentTransaction);
                 break;
             case CANCELING:
